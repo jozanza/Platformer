@@ -4,6 +4,8 @@
 char* GAME_TITLE = "Platformer!";
 int SCREEN_W     = 500;
 int SCREEN_H     = 500;
+int TITLE_SCENE  = 1;
+int LEVEL_SCENE  = 2;
 
 int main(void) {
   //* Open a window
@@ -11,60 +13,86 @@ int main(void) {
   SetTargetFPS(60); //! set this or else!
 
   //* Initalize the game state
-  int x        = SCREEN_W / 2;
-  int y        = SCREEN_H / 2;
-  int speed    = 0;
-  int speedCap = 10;
-  int accel    = 4;
-  float size   = 10;
-  Color color  = RED;
+  int currentScene = TITLE_SCENE;
+  int x            = SCREEN_W / 2;
+  int y            = SCREEN_H / 2;
+  int speed        = 0;
+  int speedCap     = 10;
+  int accel        = 4;
+  float size       = 10;
+  Color color      = RED;
 
   //* Enter the game loop
   //- NOTE: Will run as long as window is not closed (or ESC is pressed)
   while (!WindowShouldClose()) {
-    //* Update the game state
-    // Adjust speed or momentum
-    bool isMoving = speed != 0;
-    if (isMoving) {
-      if (speed < 0) {
-        speed++;
+    //! TITLE SCENE
+    if (currentScene == TITLE_SCENE) {
+      //* Update Title scene
+      if (IsKeyPressed(KEY_ENTER)) {
+        currentScene = LEVEL_SCENE;
       }
-      if (speed > 0) {
-        speed--;
-      }
+      //* Draw Title scene
+      BeginDrawing();
+      ClearBackground(WHITE);
+      float fontSize = 24;
+      int fontWidth  = MeasureText(GAME_TITLE, fontSize);
+      DrawText(
+          GAME_TITLE,
+          (SCREEN_W / 2) - (fontWidth / 2),
+          (SCREEN_H / 2) - (fontSize / 2),
+          fontSize,
+          BLACK);
+      EndDrawing();
     }
 
-    // increase left velocity
-    if (IsKeyDown(KEY_A) && speed > -speedCap) {
-      // apply acceleration
-      speed -= accel;
-      // If going too fast
-      if (speed < -speedCap) {
-        // Reset to speed cap
-        speed = -speedCap;
+    //! LEVEL SCENE
+    else if (currentScene == LEVEL_SCENE) {
+      //* Update Level scene
+      if (IsKeyPressed(KEY_BACKSPACE)) {
+        currentScene = TITLE_SCENE;
       }
-    }
-
-    // increase right velocity
-    if (IsKeyDown(KEY_D) && speed < speedCap) {
-      // apply acceleration
-      speed += accel;
-      // If going too fast
-      if (speed < speedCap) {
-        // Reset to speed cap
-        speed = speedCap;
+      // Adjust speed or momentum
+      bool isMoving = speed != 0;
+      if (isMoving) {
+        if (speed < 0) {
+          speed++;
+        }
+        if (speed > 0) {
+          speed--;
+        }
       }
+
+      // increase left velocity
+      if (IsKeyDown(KEY_A) && speed > -speedCap) {
+        // apply acceleration
+        speed -= accel;
+        // If going too fast
+        if (speed < -speedCap) {
+          // Reset to speed cap
+          speed = -speedCap;
+        }
+      }
+
+      // increase right velocity
+      if (IsKeyDown(KEY_D) && speed < speedCap) {
+        // apply acceleration
+        speed += accel;
+        // If going too fast
+        if (speed < speedCap) {
+          // Reset to speed cap
+          speed = speedCap;
+        }
+      }
+
+      // Move ball left/right
+      x += speed;
+
+      //* Draw Level scene
+      BeginDrawing();
+      ClearBackground(WHITE);
+      DrawCircle(x, y, size, color);
+      EndDrawing();
     }
-
-    // Move ball left/right
-    x += speed;
-
-    //* Draw the game state
-    BeginDrawing();
-    ClearBackground(WHITE);
-    // x: 252
-    DrawCircle(x, y, size, color);
-    EndDrawing();
   }
 
   //* Done with this game. Program is closing
