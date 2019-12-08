@@ -1,7 +1,7 @@
 #include <raylib.h>
 #include <stdio.h>
 
-char* GAME_TITLE = "Platformer!";
+char* GAME_TITLE = "Project S.H.E.L.L.";
 int SCREEN_W     = 500;
 int SCREEN_H     = 500;
 int TITLE_SCENE  = 1;
