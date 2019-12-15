@@ -19,6 +19,11 @@ int main(void) {
   int speed        = 0;
   int speedCap     = 10;
   int accel        = 4;
+  int gravity      = 0;
+  int fall         = 1;
+  int jump         = 5;
+  int jumpCap      = 10;
+  int gravCap      = 2;
   float size       = 10;
   Color color      = RED;
 
@@ -83,9 +88,24 @@ int main(void) {
           speed = speedCap;
         }
       }
-
+      if (LEVEL_SCENE == LEVEL_SCENE && gravity < gravCap) {
+        gravity += fall;
+        if (gravity > gravCap) {
+          gravity = gravCap;
+        }
+      }
       // Move ball left/right
       x += speed;
+      // Make ball fall 
+      y += gravity;
+      if (IsKeyDown(KEY_SPACE)) {
+        y -= jump;
+        jump++ ; 
+        if (jump > jumpCap) {
+          // Reset to speed cap
+          jump = gravity;
+        }
+      }
 
       //* Draw Level scene
       BeginDrawing();
