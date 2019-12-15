@@ -1,6 +1,127 @@
 #include <raylib.h>
 #include <stdio.h>
 
+typedef struct Player {
+  Rectangle rect;
+  Color color;
+  int accelX;
+  int accelY;
+  int speedX;
+  int speedY;
+  int speedCapX;
+  int speedCapY;
+} Player;
+
+typedef struct Platform {
+  Rectangle rect;
+  Color color;
+} Platform;
+
+// DEFINITIONS AND TERMS TO HELP //
+// && -= += ==
+// a <infix> b
+// a || b <- a or b
+// a && b <- a and b
+// a -= b <- subtract b from a
+// a += b <- add b to a
+// a == b <- a is equal to b
+// a != b <- a does not equal b
+// -- minus 1
+// ++ add 1
+
+void DrawPlayer(Player* p) {
+  DrawRectangle(p->rect.x, p->rect.y, p->rect.width, p->rect.height, p->color);
+}
+
+void UpdatePlayer(Player* p, Platform* platforms, int numPlatforms) {
+  // handle friction
+  bool isPlayerWalking = p->speedX != 0;
+  if (isPlayerWalking) {
+    // moving right
+    if (p->speedX > 0) {
+      p->speedX--;
+    }
+    // moving left
+    if (p->speedX < 0) {
+      p->speedX++;
+    }
+  }
+   
+  // handle gravity
+  bool isPlayerInTheAir = false;
+  if (isPlayerInTheAir) {
+    // apply gravity
+  }
+
+  // Moving right
+  bool isMaxRightSpeed = p->speedX >= p->speedCapX;
+  bool isWallToRight = false; // TODO
+  bool canPlayerMoveRight = !isMaxRightSpeed && !isWallToRight;
+  bool doesPlayerWantToMoveRight = IsKeyDown(KEY_D);
+  bool shouldPlayerMoveRight = doesPlayerWantToMoveRight && canPlayerMoveRight;
+
+  if (shouldPlayerMoveRight) {
+    // puts("HIIIIIIT!!!!");
+    // printf("%s: (%d, %d)\n", "position", p->x, p->y); <- how to debug code
+    
+    // apply acceleration
+    p->speedX += p->accelX;
+    // If going too fast
+    if (p->speedX > p->speedCapX) {
+      // Reset to speed cap
+      p->speedX = p->speedCapX;
+    }
+  }
+  
+  // Moving left
+  bool isMaxLeftSpeed = p->speedX <= -p->speedCapX;
+  if (IsKeyDown(KEY_A) && !isMaxLeftSpeed) {
+    // apply acceleration
+    p->speedX -= p->accelX;
+    // If going too fast
+    if (p->speedX < -p->speedCapX) {
+      // Reset to speed cap
+      p->speedX = -p->speedCapX;
+    }
+  }
+
+  // Project player's next position
+  Rectangle nextRect = {
+    .x = p->rect.x + p->speedX,
+    .y = p->rect.y + p->speedY,
+    .width = p->rect.width,
+    .height = p->rect.height,
+  };
+  // Loops over platforms and find collisions
+  for (int i = 0; i < numPlatforms; i++) {
+    Platform platform = platforms[i];
+    bool willHitPlatform = CheckCollisionRecs(nextRect, platform.rect);
+    // If collided, then stop the player
+    if (willHitPlatform) {
+      bool isMovingLeft = p->speedX < 0;
+      if (isMovingLeft) {
+        // stop at right side of platform
+        nextRect.x = platform.rect.x + platform.rect.width;
+      }
+      bool isMovingRight = p->speedX > 0;
+      if (isMovingRight) {
+        // stop at the left side of the platform
+        nextRect.x = platform.rect.x - p->rect.width;
+      }
+      // stop player
+      p->speedX = 0;
+      break;
+    }
+  }
+
+  // Actually move the player
+  p->rect = nextRect;
+
+  if (IsKeyDown(KEY_SPACE)) {
+    // make player jump
+  }
+}
+
 char* GAME_TITLE = "Project S.H.E.L.L.";
 int SCREEN_W     = 500;
 int SCREEN_H     = 500;
@@ -16,6 +137,7 @@ int main(void) {
   int currentScene = TITLE_SCENE;
   int x            = SCREEN_W / 2;
   int y            = SCREEN_H / 2;
+  int floorY       = y;
   int speed        = 0;
   int speedCap     = 10;
   int accel        = 4;
@@ -26,6 +148,23 @@ int main(void) {
   int gravCap      = 2;
   float size       = 10;
   Color color      = RED;
+  
+  Player shell = {
+    .rect = (Rectangle){x, y, 8, 8},
+    .accelX = 4,
+    .accelY = 5,
+    .speedX = 0,
+    .speedY = 0,
+    .speedCapX = 10,
+    .speedCapY = 2,
+    .color = RED,
+  };
+  
+  Platform platforms[3] = {
+    {.rect={x + 64, y + 8, 16, 32}, .color=GREEN},
+    {.rect={x - 64, y + 8, 16, 32}, .color=RED},
+    {.rect={x + 200, y + 8, 16, 32}, .color=BLUE},
+  };
 
   //* Enter the game loop
   //- NOTE: Will run as long as window is not closed (or ESC is pressed)
@@ -56,61 +195,39 @@ int main(void) {
       if (IsKeyPressed(KEY_BACKSPACE)) {
         currentScene = TITLE_SCENE;
       }
-      // Adjust speed or momentum
-      bool isMoving = speed != 0;
-      if (isMoving) {
-        if (speed < 0) {
-          speed++;
-        }
-        if (speed > 0) {
-          speed--;
-        }
-      }
 
-      // increase left velocity
-      if (IsKeyDown(KEY_A) && speed > -speedCap) {
-        // apply acceleration
-        speed -= accel;
-        // If going too fast
-        if (speed < -speedCap) {
-          // Reset to speed cap
-          speed = -speedCap;
-        }
-      }
+      // Apply jump
+      // if (IsKeyDown(KEY_SPACE)) {
+      //   y -= jump;
+      //   jump++; 
+      //   if (jump > jumpCap) {
+      //     // Reset to jump cap
+      //     jump = gravity;
+      //   }
+      // }
 
-      // increase right velocity
-      if (IsKeyDown(KEY_D) && speed < speedCap) {
-        // apply acceleration
-        speed += accel;
-        // If going too fast
-        if (speed < speedCap) {
-          // Reset to speed cap
-          speed = speedCap;
-        }
-      }
-      if (LEVEL_SCENE == LEVEL_SCENE && gravity < gravCap) {
-        gravity += fall;
-        if (gravity > gravCap) {
-          gravity = gravCap;
-        }
-      }
       // Move ball left/right
-      x += speed;
+      // x += speed;
       // Make ball fall 
-      y += gravity;
-      if (IsKeyDown(KEY_SPACE)) {
-        y -= jump;
-        jump++ ; 
-        if (jump > jumpCap) {
-          // Reset to speed cap
-          jump = gravity;
-        }
-      }
+      // y += gravity;
+
+      UpdatePlayer(&shell, &platforms[0], 3);
 
       //* Draw Level scene
       BeginDrawing();
+      // clear screen
       ClearBackground(WHITE);
-      DrawCircle(x, y, size, color);
+
+      // draw player
+      DrawPlayer(&shell);
+
+      // Draw all platforms
+      DrawRectangle(0, floorY + 8, SCREEN_W, 8, BLACK);
+      for (int i = 0; i < 3; i++) {
+        Platform p = platforms[i];
+        DrawRectangle(p.rect.x, p.rect.y - p.rect.height, p.rect.width, p.rect.height, p.color);
+      }
+
       EndDrawing();
     }
   }
