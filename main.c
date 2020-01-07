@@ -1,238 +1,189 @@
+#include "duktape.h"
 #include <raylib.h>
 #include <stdio.h>
 
-typedef struct Player {
-  Rectangle rect;
-  Color color;
-  int accelX;
-  int accelY;
-  int speedX;
-  int speedY;
-  int speedCapX;
-  int speedCapY;
-} Player;
+typedef struct Console {
+  struct {
+    Vector2 resolution;
+    Color palette[16];
+    int colors;
+    int fps;
+  } video;
+  struct {
+    Vector2 size;
+  } spritesheet;
+  struct {
+    Vector2 size;
+  } spritemap;
+} Console;
 
-typedef struct Platform {
-  Rectangle rect;
-  Color color;
-} Platform;
+Console DEFAULT_CONSOLE = {
+    .video = {
+        .resolution = {128, 128},
+        .palette    = {
+            {0, 0, 0, 0},
+            BLACK,
+            WHITE,
+            RED,
+            GREEN,
+            BLUE,
+        },
+        .colors = 6,
+        .fps    = 30,
+    },
+    .spritesheet = {
+        .size = {128, 128},
+    },
+    .spritemap = {
+        .size = {512, 512},
+    },
+};
 
-// DEFINITIONS AND TERMS TO HELP //
-// && -= += ==
-// a <infix> b
-// a || b <- a or b
-// a && b <- a and b
-// a -= b <- subtract b from a
-// a += b <- add b to a
-// a == b <- a is equal to b
-// a != b <- a does not equal b
-// -- minus 1
-// ++ add 1
+typedef struct Cartridge {
+  const char* name;
+  int* spritesheet;
+  int* spritemap;
+  const char* script;
+} Cartridge;
 
-void DrawPlayer(Player* p) {
-  DrawRectangle(p->rect.x, p->rect.y, p->rect.width, p->rect.height, p->color);
+Cartridge DEFAULT_CARTRIDGE = {
+    .name        = "Demo game",
+    .spritesheet = (int[64]){
+        // clang-format off
+      2, 2, 2, 2, 2, 2, 2, 2, 
+      2, 2, 2, 2, 2, 2, 2, 2, 
+      2, 2, 0, 2, 2, 0, 2, 2, 
+      2, 2, 2, 2, 2, 2, 2, 2, 
+      2, 2, 2, 2, 2, 2, 2, 2, 
+      2, 2, 0, 2, 2, 0, 2, 2, 
+      2, 2, 2, 0, 0, 2, 2, 2, 
+      2, 2, 2, 2, 2, 2, 2, 2,
+        // clang-format on
+    },
+    .script = "var i = 0;"
+              "function update() { i++; }"
+              "function draw() { text('DEMO ' + i, 0, 0, 2); }",
+};
+
+static duk_ret_t fantasy_log(duk_context* ctx) {
+  printf("%s\n", duk_to_string(ctx, 0));
+  return 0; /* no return value (= undefined) */
 }
 
-void UpdatePlayer(Player* p, Platform* platforms, int numPlatforms) {
-  // handle friction
-  bool isPlayerWalking = p->speedX != 0;
-  if (isPlayerWalking) {
-    // moving right
-    if (p->speedX > 0) {
-      p->speedX--;
-    }
-    // moving left
-    if (p->speedX < 0) {
-      p->speedX++;
-    }
-  }
-   
-  // handle gravity
-  bool isPlayerInTheAir = false;
-  if (isPlayerInTheAir) {
-    // apply gravity
-  }
-
-  // Moving right
-  bool isMaxRightSpeed = p->speedX >= p->speedCapX;
-  bool isWallToRight = false; // TODO
-  bool canPlayerMoveRight = !isMaxRightSpeed && !isWallToRight;
-  bool doesPlayerWantToMoveRight = IsKeyDown(KEY_D);
-  bool shouldPlayerMoveRight = doesPlayerWantToMoveRight && canPlayerMoveRight;
-
-  if (shouldPlayerMoveRight) {
-    // puts("HIIIIIIT!!!!");
-    // printf("%s: (%d, %d)\n", "position", p->x, p->y); <- how to debug code
-    
-    // apply acceleration
-    p->speedX += p->accelX;
-    // If going too fast
-    if (p->speedX > p->speedCapX) {
-      // Reset to speed cap
-      p->speedX = p->speedCapX;
-    }
-  }
-  
-  // Moving left
-  bool isMaxLeftSpeed = p->speedX <= -p->speedCapX;
-  if (IsKeyDown(KEY_A) && !isMaxLeftSpeed) {
-    // apply acceleration
-    p->speedX -= p->accelX;
-    // If going too fast
-    if (p->speedX < -p->speedCapX) {
-      // Reset to speed cap
-      p->speedX = -p->speedCapX;
-    }
-  }
-
-  // Project player's next position
-  Rectangle nextRect = {
-    .x = p->rect.x + p->speedX,
-    .y = p->rect.y + p->speedY,
-    .width = p->rect.width,
-    .height = p->rect.height,
-  };
-  // Loops over platforms and find collisions
-  for (int i = 0; i < numPlatforms; i++) {
-    Platform platform = platforms[i];
-    bool willHitPlatform = CheckCollisionRecs(nextRect, platform.rect);
-    // If collided, then stop the player
-    if (willHitPlatform) {
-      bool isMovingLeft = p->speedX < 0;
-      if (isMovingLeft) {
-        // stop at right side of platform
-        nextRect.x = platform.rect.x + platform.rect.width;
-      }
-      bool isMovingRight = p->speedX > 0;
-      if (isMovingRight) {
-        // stop at the left side of the platform
-        nextRect.x = platform.rect.x - p->rect.width;
-      }
-      // stop player
-      p->speedX = 0;
-      break;
-    }
-  }
-
-  // Actually move the player
-  p->rect = nextRect;
-
-  if (IsKeyDown(KEY_SPACE)) {
-    // make player jump
-  }
+static duk_ret_t fantasy_text(duk_context* ctx) {
+  const char* text = duk_to_string(ctx, 0);
+  int x            = duk_to_number(ctx, 1);
+  int y            = duk_to_number(ctx, 2);
+  int c            = duk_to_number(ctx, 3);
+  DrawText(text, x, y, 16.0, DEFAULT_CONSOLE.video.palette[c]);
+  return 0;
 }
 
-char* GAME_TITLE = "Project S.H.E.L.L.";
-int SCREEN_W     = 500;
-int SCREEN_H     = 500;
-int TITLE_SCENE  = 1;
-int LEVEL_SCENE  = 2;
+void Fantasy_init_bindings(duk_context* ctx) {
+  // log(string): void
+  duk_push_c_function(ctx, fantasy_log, 1);
+  duk_put_global_string(ctx, "log");
+  // text(s: string, x: number, y: number, color: number): void
+  duk_push_c_function(ctx, fantasy_text, 4);
+  duk_put_global_string(ctx, "text");
+}
 
 int main(void) {
-  //* Open a window
-  InitWindow(SCREEN_W, SCREEN_H, GAME_TITLE);
-  SetTargetFPS(60); //! set this or else!
+  char history[4097][4097] = {0};
+  int idx_hist             = 0;
+  char input[4097]         = "\0";
+  int idx_in               = 0;
+  int frame                = 0;
 
-  //* Initalize the game state
-  int currentScene = TITLE_SCENE;
-  int x            = SCREEN_W / 2;
-  int y            = SCREEN_H / 2;
-  int floorY       = y;
-  int speed        = 0;
-  int speedCap     = 10;
-  int accel        = 4;
-  int gravity      = 0;
-  int fall         = 1;
-  int jump         = 5;
-  int jumpCap      = 10;
-  int gravCap      = 2;
-  float size       = 10;
-  Color color      = RED;
-  
-  Player shell = {
-    .rect = (Rectangle){x, y, 8, 8},
-    .accelX = 4,
-    .accelY = 5,
-    .speedX = 0,
-    .speedY = 0,
-    .speedCapX = 10,
-    .speedCapY = 2,
-    .color = RED,
-  };
-  
-  Platform platforms[3] = {
-    {.rect={x + 64, y + 8, 16, 32}, .color=GREEN},
-    {.rect={x - 64, y + 8, 16, 32}, .color=RED},
-    {.rect={x + 200, y + 8, 16, 32}, .color=BLUE},
-  };
+  duk_context* ctx = duk_create_heap_default();
+  Fantasy_init_bindings(ctx);
 
-  //* Enter the game loop
-  //- NOTE: Will run as long as window is not closed (or ESC is pressed)
+  InitWindow(256, 256, "FantasyJS");
+  SetTargetFPS(60);
+
   while (!WindowShouldClose()) {
-    //! TITLE SCENE
-    if (currentScene == TITLE_SCENE) {
-      //* Update Title scene
-      if (IsKeyPressed(KEY_ENTER)) {
-        currentScene = LEVEL_SCENE;
+    ClearBackground(BLACK);
+
+    // Update input
+    int key     = GetKeyPressed();
+    int prevKey = 0;
+    while (key > 0 && key != prevKey) {
+      if ((key >= 32) && (key <= 125) && idx_in < 4097) {
+        printf("Got char '%c' (%d), at index %d\n", (char)key, key, idx_in);
+        input[idx_in++] = (char)key;
       }
-      //* Draw Title scene
-      BeginDrawing();
-      ClearBackground(WHITE);
-      float fontSize = 24;
-      int fontWidth  = MeasureText(GAME_TITLE, fontSize);
-      DrawText(
-          GAME_TITLE,
-          (SCREEN_W / 2) - (fontWidth / 2),
-          (SCREEN_H / 2) - (fontSize / 2),
-          fontSize,
-          BLACK);
-      EndDrawing();
+      prevKey = key;
+      key     = GetKeyPressed();
+    }
+    if (IsKeyPressed(KEY_BACKSPACE) && idx_in > 0) {
+      input[--idx_in] = '\0';
     }
 
-    //! LEVEL SCENE
-    else if (currentScene == LEVEL_SCENE) {
-      //* Update Level scene
-      if (IsKeyPressed(KEY_BACKSPACE)) {
-        currentScene = TITLE_SCENE;
+    // Process commands
+    if (IsKeyPressed(KEY_ENTER) && idx_in > 0) {
+      printf("input -> %s\n", input);
+      if (strcmp("run demo", input) == 0) {
+        duk_idx_t top = duk_get_top(ctx);
+        duk_eval_string_noresult(ctx, DEFAULT_CARTRIDGE.script);
+        duk_get_global_string(ctx, "name");
+        const char* name = duk_get_string(ctx, top);
+        CloseWindow();
+        InitWindow(
+            DEFAULT_CONSOLE.video.resolution.x,
+            DEFAULT_CONSOLE.video.resolution.y,
+            DEFAULT_CARTRIDGE.name);
+        SetTargetFPS(DEFAULT_CONSOLE.video.fps);
+        puts("------------");
+        Color pixels[64] = {0};
+        for (int i = 0; i < 64; i++) {
+          Color c   = DEFAULT_CONSOLE.video.palette[DEFAULT_CARTRIDGE.spritesheet[i]];
+          pixels[i] = c;
+        }
+        puts("ASDSA");
+        Image spritesheet = LoadImageEx(pixels, 8, 8);
+        puts("AAAAAAA");
+        Texture2D tex = LoadTextureFromImage(spritesheet);
+        puts("BBBBBB");
+        while (!WindowShouldClose()) {
+          duk_set_top(ctx, top);
+          BeginDrawing();
+          {
+            ClearBackground(BLACK);
+            duk_get_global_string(ctx, "draw");
+            duk_call(ctx, 0 /*nargs*/);
+            DrawTexture(tex, 0, 32, WHITE);
+          };
+          EndDrawing();
+          duk_get_global_string(ctx, "update");
+          duk_call(ctx, 0 /*nargs*/);
+        }
+        InitWindow(256, 256, "FantasyJS");
+        SetTargetFPS(60);
       }
-
-      // Apply jump
-      // if (IsKeyDown(KEY_SPACE)) {
-      //   y -= jump;
-      //   jump++; 
-      //   if (jump > jumpCap) {
-      //     // Reset to jump cap
-      //     jump = gravity;
-      //   }
-      // }
-
-      // Move ball left/right
-      // x += speed;
-      // Make ball fall 
-      // y += gravity;
-
-      UpdatePlayer(&shell, &platforms[0], 3);
-
-      //* Draw Level scene
-      BeginDrawing();
-      // clear screen
-      ClearBackground(WHITE);
-
-      // draw player
-      DrawPlayer(&shell);
-
-      // Draw all platforms
-      DrawRectangle(0, floorY + 8, SCREEN_W, 8, BLACK);
-      for (int i = 0; i < 3; i++) {
-        Platform p = platforms[i];
-        DrawRectangle(p.rect.x, p.rect.y - p.rect.height, p.rect.width, p.rect.height, p.color);
+      strncpy(history[idx_hist], input, 4097);
+      idx_hist++;
+      for (int i = 0; i < idx_hist; i++) {
+        printf("%d > %s\n", i, history[i]);
       }
-
-      EndDrawing();
+      memset(input, 0, 4097);
+      idx_in = 0;
     }
+    BeginDrawing();
+    {
+      ClearBackground(BLACK);
+      const char* format = frame % 32 < 16 ? "> %s_" : "> %s";
+      DrawTextRec(
+          GetFontDefault(),
+          TextFormat(format, input),
+          (Rectangle){28, 28, 200, 200},
+          16.0,
+          1.0,
+          true,
+          WHITE);
+    }
+    EndDrawing();
+    frame++;
   }
-
-  //* Done with this game. Program is closing
   CloseWindow();
   return 0;
 }
