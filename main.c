@@ -174,7 +174,13 @@ int main(void) {
 
   InitWindow(windowW, windowH, windowTitle);
   SetTargetFPS(windowFPS);
+  SetTraceLogLevel(LOG_TRACE);
 
+  // Image fontImage = LoadImage("baby.png");
+  // printf("%dx%d\n", fontImage.width, fontImage.height);
+  // Font cliFont = LoadFontFromImage(fontImage, MAGENTA, 32);
+  Font cliFont = LoadFont("baby.png");
+  puts("LOADED");
   const int cliPadding = 56 / 2;
   Rectangle cliRec     = (Rectangle){cliPadding, cliPadding, windowW - (cliPadding * 2), windowH - (cliPadding * 2)};
   float cliFontSize    = 16.0;
@@ -203,7 +209,7 @@ int main(void) {
       const char* format = frame % 32 < 16 ? "> %s_" : "> %s";
       const char* text   = TextFormat(format, input);
       DrawTextRec(
-          GetFontDefault(),
+          cliFont,// GetFontDefault(),
           text,
           cliRec,
           cliFontSize,
