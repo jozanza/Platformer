@@ -167,7 +167,7 @@ void RunFantasyCartridge(Console* console, Cartridge* cartridge) {
 }
 
 int main(void) {
-  const char* windowTitle = "Fantasy";
+  const char* windowTitle = "Starship";
   const int windowW       = 256;
   const int windowH       = 256;
   const int windowFPS     = 60;
