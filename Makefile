@@ -26,6 +26,12 @@ BIN := platformer
 # Default task
 all: build
 
+raylib.so: raylib.c
+	$(CC) $(LIB) -shared -o $@ -fPIC quickjs/libquickjs.a  $<
+
+js: raylib.so
+	./quickjs/qjsc -o test test.js && ./test
+
 # Builds the app
 build:
 	clear

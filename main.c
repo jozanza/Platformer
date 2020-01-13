@@ -168,23 +168,20 @@ void RunFantasyCartridge(Console* console, Cartridge* cartridge) {
 
 int main(void) {
   const char* windowTitle = "Starship";
-  const int windowW       = 256;
-  const int windowH       = 256;
+  const int windowW       = 800;
+  const int windowH       = 800;
   const int windowFPS     = 60;
 
   InitWindow(windowW, windowH, windowTitle);
   SetTargetFPS(windowFPS);
   SetTraceLogLevel(LOG_TRACE);
 
-  // Image fontImage = LoadImage("baby.png");
-  // printf("%dx%d\n", fontImage.width, fontImage.height);
-  // Font cliFont = LoadFontFromImage(fontImage, MAGENTA, 32);
   Font cliFont = LoadFont("baby.png");
   puts("LOADED");
   const int cliPadding = 56 / 2;
   Rectangle cliRec     = (Rectangle){cliPadding, cliPadding, windowW - (cliPadding * 2), windowH - (cliPadding * 2)};
   float cliFontSize    = 16.0;
-  float cliSpacing     = 1.0;
+  float cliSpacing     = cliFontSize / 4.0;
   float cliWordWrap    = false;
   Color cliFontColor   = WHITE;
 
