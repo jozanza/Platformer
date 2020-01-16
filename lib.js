@@ -4,6 +4,10 @@ import * as raylib from './raylib.so'
 // Library
 //------------------------------------------------------------------------------
 
+export class Utils {
+  static clamp = (min, max, n) => Math.min(max, Math.max(min, n))
+}
+
 export class Button {
   static A = 90 // Z
   static B = 88 // X
@@ -17,6 +21,7 @@ export class Color {
   static black = { r: 0, g: 0, b: 0, a: 255 }
   static white = { r: 255, g: 255, b: 255, a: 255 }
   static pink = { r: 255, g: 109, b: 194, a: 255 }
+  static green = { r: 0, g: 255, b: 194, a: 255 }
 }
 
 export class Window {
@@ -24,11 +29,12 @@ export class Window {
   static width = 512
   static height = 512
   static fps = 60
+  static frame = 0
 }
 
 export class Canvas {
-  static width = 256
-  static height = 256
+  static width = 320
+  static height = 240
 }
 
 export class Font {
@@ -74,7 +80,8 @@ export class Component {
 
 export class Game {
   static run(init, destroy, draw, update) {
-    raylib.initWindow(Canvas.width, Canvas.height, Window.title)
+    raylib.initWindow(Window.width, Window.height, Window.title)
+    raylib.initCanvas(Canvas.width, Canvas.height)
     raylib.setTargetFPS(Window.fps)
     Font.small = raylib.loadFont('baby.png')
     let events = []
@@ -91,6 +98,7 @@ export class Game {
         update(ctx, event)
       }
       events = []
+      Window.frame++
     }
     destroy(ctx)
     raylib.closeWindow()
@@ -107,6 +115,7 @@ export class Game {
       raylib.endDrawing()
       // update
       root.update()
+      Window.frame++
     }
     root.destroy()
     raylib.closeWindow()
@@ -114,15 +123,35 @@ export class Game {
 }
 
 export class Input {
+  static buttonDownFrame = {}
   /**
-   * Checks whether a button was pressed this frame
-   *
-   * @param   {Number}  button  button to check
-   *
-   * @return  {Boolean}         was the button pressed
+   * Checks if a button is pressed this frame
+   * @param   {Number}  button  Button ID
+   * @return  {Boolean}         The button pressed state
    */
   static isButtonPressed(button) {
     return raylib.isKeyPressed(button)
+  }
+  /**
+   * Checks if a button is being held down this frame
+   * @param   {Number}  button    Button ID
+   * @param   {Number}  throttle  Number of frames to throttle input for. Default = 0
+   * @return  {Boolean}           The button down state
+   */
+  static isButtonDown(button, throttle = 0) {
+    if (!raylib.isKeyDown(button)) {
+      Input.buttonDownFrame[button] = 0
+      return false
+    }
+    const prev = Input.buttonDownFrame[button] ?? 0
+    if (!prev) {
+      Input.buttonDownFrame[button] = Window.frame
+    }
+    const frame = Input.buttonDownFrame[button]
+    if (throttle && frame !== Window.frame) {
+      return (Window.frame - frame) % throttle === 0
+    }
+    return true
   }
 }
 
@@ -183,28 +212,50 @@ export class Gfx {
     }
     return { width, height }
   }
-  static numberInput(x0, y0, active, options) {
+  static numberInput(x0, y0, isFocused, options) {
     let pad = 8
     let x = x0 + pad
     let y = y0 + pad
     const { width, height } = Gfx.measureText(Font.small, options.label)
     // Gfx.rectfill(x0, y0, width + 4 * pad, height + 2 * pad, Color.pink)
     Gfx.print(Font.small, options.label, x, y, Color.white)
-    const value = options.value ?? options.defaultValue
+    const value = options.value ?? options.defaultValue ?? 0
+    const targetLength =
+      options.targetLength ?? (options.max?.toString().length || 0)
+    const displayValue = `${value}`.padStart(
+      targetLength,
+      options.padString ?? ' ',
+    )
     Gfx.print(
       Font.small,
-      `< ${value} >`,
+      !isFocused
+        ? `  ${displayValue}  `
+        : value === options.min
+        ? `- ${displayValue} >`
+        : value === options.max
+        ? `< ${displayValue} -`
+        : `< ${displayValue} >`,
       width + 2 * pad,
       y,
-      active ? Color.pink : Color.white,
+      isFocused ? Color.pink : Color.white,
     )
-    if (!active) return 0
-    if (Input.isButtonPressed(Button.left)) {
-      return -1
+    if (!isFocused) return false
+    let delta = 0
+    if (Input.isButtonDown(Button.left, 7)) {
+      delta = -1
     }
-    if (Input.isButtonPressed(Button.right)) {
-      return 1
+    if (Input.isButtonDown(Button.right, 7)) {
+      delta = 1
     }
-    return 0
+    if (delta) {
+      const amount = delta * (options.step ?? 1)
+      const currentValue = options.value ?? options.defaultValue ?? 0
+      options.value = Utils.clamp(
+        options.min ?? -Infinity,
+        options.max ?? Infinity,
+        currentValue + amount,
+      )
+    }
+    return delta
   }
 }

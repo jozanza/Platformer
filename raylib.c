@@ -1,8 +1,22 @@
 #include "quickjs/cutils.h"
 #include "quickjs/quickjs.h"
-#include <raylib.h>
+#include "raylib/src/raylib.h"
 
 // Utils
+
+static Rectangle calcLetterBox(float canvasW, float canvasH) {
+  float dpi = GetWindowDPI();
+  float windowW = GetScreenWidth() * (dpi == 1.0 ? .5 : 1);
+  float windowH = GetScreenHeight() * (dpi == 1.0 ? .5 : 1);
+  float scaleX  = windowW / canvasW;
+  float scaleY  = windowH / canvasH;
+  float scale   = scaleX < scaleY ? scaleX : scaleY;
+  float w       = scale * canvasW;
+  float h       = scale * canvasH;
+  float x       = (windowW - w) * .5;
+  float y       = (windowH - h) * .5;
+  return (Rectangle){x, y, w, h};
+}
 
 int JS_ToColor(JSContext* ctx, Color* color, JSValue obj) {
   {
@@ -66,6 +80,7 @@ int JS_ToVector2(JSContext* ctx, Vector2* vec2, JSValue obj) {
 
 // Exports
 
+static RenderTexture2D canvas;
 static JSValue initWindow(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
   int width;
   if (JS_ToInt32(ctx, &width, argv[0]))
@@ -74,12 +89,29 @@ static JSValue initWindow(JSContext* ctx, JSValueConst this_val, int argc, JSVal
   if (JS_ToInt32(ctx, &height, argv[1]))
     return JS_EXCEPTION;
   const char* title = JS_ToCString(ctx, argv[2]);
+  SetExitKey(-1);
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(width, height, title);
   JS_FreeCString(ctx, title);
+  canvas = LoadRenderTexture(width, height);
+  return JS_NULL;
+}
+
+static JSValue initCanvas(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
+  int width;
+  if (JS_ToInt32(ctx, &width, argv[0]))
+    return JS_EXCEPTION;
+  int height;
+  if (JS_ToInt32(ctx, &height, argv[1]))
+    return JS_EXCEPTION;
+  UnloadRenderTexture(canvas);
+  canvas = LoadRenderTexture(width, height);
+  // SetWindowMinSize(width, height);
   return JS_NULL;
 }
 
 static JSValue closeWindow(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
+  UnloadRenderTexture(canvas);
   CloseWindow();
   return JS_NULL;
 }
@@ -97,12 +129,59 @@ static JSValue windowShouldClose(JSContext* ctx, JSValueConst this_val, int argc
 }
 
 static JSValue beginDrawing(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
-  BeginDrawing();
+  if (IsWindowResized()) {
+    // CloseWindow();
+    // InitWindow(GetScreenWidth()*2, GetScreenHeight()*2, "title");
+    // int width, height;
+    // glfwGetFramebufferSize(GetWindowHandle(), &width, &height);
+    // printf("FramebufferSize: %dx%d\n", width, height);
+    printf("WINDOW DPI: %0.f\n", GetWindowDPI());
+  }
+  // if (IsKeyPressed(KEY_ENTER)) {
+  //   UnloadRenderTexture(canvas);
+  //   canvas = GetWindowDPI() == 1.0f
+  //     ? LoadRenderTexture(160, 120)
+  //     : LoadRenderTexture(320, 240);
+  // }
+  //   float width  = canvas.texture.width;
+  //   float height = canvas.texture.height;
+  //   CloseWindow();
+  //   InitWindow(GetScreenWidth(), GetScreenHeight(), "asda");
+  //   SetTargetFPS(60);
+  // }
+  // canvas = LoadRenderTexture(canvas.texture.width, canvas.texture.height);
+  BeginTextureMode(canvas);
+  {
+    BeginDrawing();
+  }
   return JS_NULL;
 }
 
+static float initialDPI = 0;
 static JSValue endDrawing(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
-  EndDrawing();
+  EndTextureMode();
+  {
+    float width    = canvas.texture.width;
+    float height   = canvas.texture.height;
+    Rectangle src  = {0, 0, width, -height};
+    Rectangle dst  = calcLetterBox(width, height);
+    Vector2 origin = {0, 0};
+    float rotation = 0;
+
+    BeginDrawing();
+    {
+      ClearBackground(PINK);
+      DrawTexturePro(
+          canvas.texture,
+          src,
+          dst,
+          origin,
+          rotation,
+          WHITE);
+    }
+    EndDrawing();
+    // UnloadRenderTexture(canvas);
+  }
   return JS_NULL;
 }
 
@@ -167,6 +246,13 @@ static JSValue isKeyPressed(JSContext* ctx, JSValueConst this_val, int argc, JSV
   return JS_NewBool(ctx, IsKeyPressed(key));
 }
 
+static JSValue isKeyDown(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
+  int key;
+  if (JS_ToInt32(ctx, &key, argv[0]))
+    return JS_EXCEPTION;
+  return JS_NewBool(ctx, IsKeyDown(key));
+}
+
 static JSValue loadFont(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
   const char* filename = JS_ToCString(ctx, argv[0]);
   FONTS[FONTS_LEN++]   = LoadFont(filename);
@@ -176,6 +262,7 @@ static JSValue loadFont(JSContext* ctx, JSValueConst this_val, int argc, JSValue
 
 static const JSCFunctionListEntry exports[] = {
     JS_CFUNC_DEF("initWindow", 3, initWindow),
+    JS_CFUNC_DEF("initCanvas", 2, initCanvas),
     JS_CFUNC_DEF("closeWindow", 0, closeWindow),
     JS_CFUNC_DEF("setTargetFPS", 1, setTargetFPS),
     JS_CFUNC_DEF("windowShouldClose", 0, windowShouldClose),
@@ -185,6 +272,7 @@ static const JSCFunctionListEntry exports[] = {
     JS_CFUNC_DEF("drawRectangle", 5, drawRectangle),
     JS_CFUNC_DEF("drawTextEx", 6, drawTextEx),
     JS_CFUNC_DEF("isKeyPressed", 1, isKeyPressed),
+    JS_CFUNC_DEF("isKeyDown", 1, isKeyDown),
     JS_CFUNC_DEF("loadFont", 1, loadFont),
 };
 

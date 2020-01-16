@@ -1,7 +1,5 @@
 import { Button, Color, Canvas, Font, Game, Input, Gfx } from './lib.js'
 
-const clamp = (min, max, n) => Math.min(max, Math.max(min, n))
-
 const SPACING = 16
 
 const EVENT_NEXT_FRAME = Symbol('NextFrameEvent')
@@ -34,7 +32,7 @@ function init() {
           INPUT_TYPE_NUMBER,
           {
             tabIndex: 0,
-            label: 'Number of Rounds',
+            label: 'Number of Rounds  ',
             defaultValue: 10,
             value: null,
             min: 1,
@@ -46,7 +44,7 @@ function init() {
           INPUT_TYPE_NUMBER,
           {
             tabIndex: 1,
-            label: 'Starting Level',
+            label: 'Starting Level    ',
             defaultValue: 1,
             value: null,
             min: 1,
@@ -58,9 +56,11 @@ function init() {
           INPUT_TYPE_NUMBER,
           {
             tabIndex: 2,
-            label: 'Number of Players',
+            label: 'Number of Players ',
             defaultValue: 1,
             value: null,
+            targetLength: 3,
+            padString: ' ',
             min: 1,
             max: 8,
             step: 1,
@@ -101,15 +101,14 @@ function update(ctx, dispatch) {
     {
       let x = 0
       let y = 0
-      Gfx.print(Font.small, 'Setup!', x, y, Color.white)
+      Gfx.print(Font.small, 'Setup!', x+1, y, Color.white)
       y += SPACING
       for (const [type, options] of inputs) {
-        const active = options.tabIndex == ctx.tabIndex
+        const isFocused = options.tabIndex == ctx.tabIndex
         if (type == INPUT_TYPE_NUMBER) {
-          const delta = Gfx.numberInput(x, y, active, options)
-          const amount = delta * options.step
-          const currentValue = options.value ?? options.defaultValue
-          options.value = clamp(options.min, options.max, currentValue + amount)
+          if (Gfx.numberInput(x, y, isFocused, options)) {
+            // input updated
+          }
           y += SPACING
         }
       }

@@ -1,5 +1,5 @@
 # Silence command output by default
-.SILENT:
+# .SILENT:
 
 # We're just using make as a task runner
 .PHONY: all build run test
@@ -17,8 +17,12 @@ SRC := $(filter-out %_test.c, $(wildcard *.c **/*.c))
 TST := $(filter-out main.c, $(wildcard *.c **/*.c))
 
 # System libraries (be sure to have these installed)
-LIB := \
-	-lraylib
+LIB :=
+# LIB += -lraylib # has DPI scaling issues :(
+LIB += -framework OpenGL
+LIB += -lglfw
+LIB += raylib/src/libraylib.a
+LIB += quickjs/libquickjs.a
 
 # Executable name
 BIN := platformer
@@ -27,7 +31,7 @@ BIN := platformer
 all: build
 
 raylib.so: raylib.c
-	$(CC) $(LIB) -shared -o $@ -fPIC quickjs/libquickjs.a  $<
+	$(CC) $(LIB) -shared -o $@ -fPIC $<
 
 js: raylib.so
 	./quickjs/qjsc -o test test.js && ./test
