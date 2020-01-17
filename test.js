@@ -17,6 +17,7 @@ function init() {
   return {
     frame: 0,
     scene: SCENE_TITLE,
+    enteredAt: 0,
     tabIndex: 0,
     options: {
       numberOfRounds: 1,
@@ -82,10 +83,11 @@ function update(ctx, dispatch) {
   if (scene === SCENE_TITLE) {
     const { blinkRate } = ctx[SCENE_TITLE]
     if (frame % blinkRate < blinkRate / 2) {
-      const msg = 'Press A to Start'
-      const { width, height } = Gfx.measureText(Font.small, msg)
+      const font = Font.medium;
+      const msg = 'PRESS A TO START'
+      const { width, height } = Gfx.measureText(font, msg)
       Gfx.print(
-        Font.small,
+        font,
         msg,
         Canvas.width / 2 - width / 2,
         Canvas.height / 2 - height / 2,
@@ -99,14 +101,19 @@ function update(ctx, dispatch) {
     const { inputs } = ctx[SCENE_OPTIONS]
     // Draw
     {
-      let x = 0
+      const offset = 16
+      const duration = ctx.frame - ctx.enteredAt
+      let x = -offset + Math.min(duration, offset)
       let y = 0
-      Gfx.print(Font.small, 'Setup!', x+1, y, Color.white)
+      Gfx.print(Font.medium, 'SETUP!', x + 1, 1, Color.white)
       y += SPACING
       for (const [type, options] of inputs) {
-        const isFocused = options.tabIndex == ctx.tabIndex
+        const i = options.tabIndex
+        const isFocused = i == ctx.tabIndex
         if (type == INPUT_TYPE_NUMBER) {
-          if (Gfx.numberInput(x, y, isFocused, options)) {
+          const n = i * 4;
+          const x_ = -offset + Math.min(duration - n, offset)
+          if (Gfx.numberInput(x_, y, isFocused, options)) {
             // input updated
           }
           y += SPACING
@@ -150,6 +157,7 @@ function subscribe(ctx, [type, data]) {
         const nextScene = data
         ctx.scene = nextScene
         ctx.tabIndex = 0
+        ctx.enteredAt = ctx.frame + 1
       }
       break
     case EVENT_SET_TAB_INDEX:

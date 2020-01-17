@@ -33,8 +33,8 @@ export class Window {
 }
 
 export class Canvas {
-  static width = 320
-  static height = 240
+  static width = 160
+  static height = 120
 }
 
 export class Font {
@@ -84,6 +84,7 @@ export class Game {
     raylib.initCanvas(Canvas.width, Canvas.height)
     raylib.setTargetFPS(Window.fps)
     Font.small = raylib.loadFont('baby.png')
+    Font.medium = raylib.loadFont('chonk.png')
     let events = []
     const dispatch = (a, b) => events.push([a, b])
     // init
@@ -195,6 +196,9 @@ export class Gfx {
     color = Color.white,
   ) {
     switch (font) {
+      case Font.medium:
+        raylib.drawTextEx(Font.medium, text, { x, y }, 7, 1, color)
+        break
       case Font.small:
       default:
         raylib.drawTextEx(Font.small, text, { x, y }, 4, 1, color)
@@ -203,6 +207,13 @@ export class Gfx {
   static measureText(font = Font.small, text = '', box = null) {
     let width = 0
     let height = 0
+    if (font == Font.medium) {
+      const charWidth = 7
+      const charHeight = 7
+      const charSpacing = 1
+      width = text.length * (charWidth + charSpacing) - 1
+      height = charHeight
+    }
     if (font == Font.small) {
       const charWidth = 4
       const charHeight = 4

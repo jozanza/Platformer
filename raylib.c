@@ -239,6 +239,13 @@ static JSValue drawTextEx(JSContext* ctx, JSValueConst this_val, int argc, JSVal
   return JS_NULL;
 }
 
+static JSValue loadFont(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
+  const char* filename = JS_ToCString(ctx, argv[0]);
+  FONTS[FONTS_LEN++]   = LoadFont(filename);
+  JS_FreeCString(ctx, filename);
+  return JS_NewInt32(ctx, FONTS_LEN - 1);
+}
+
 static JSValue isKeyPressed(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
   int key;
   if (JS_ToInt32(ctx, &key, argv[0]))
@@ -253,13 +260,6 @@ static JSValue isKeyDown(JSContext* ctx, JSValueConst this_val, int argc, JSValu
   return JS_NewBool(ctx, IsKeyDown(key));
 }
 
-static JSValue loadFont(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv) {
-  const char* filename = JS_ToCString(ctx, argv[0]);
-  FONTS[FONTS_LEN++]   = LoadFont(filename);
-  JS_FreeCString(ctx, filename);
-  return JS_NewInt32(ctx, FONTS_LEN - 1);
-}
-
 static const JSCFunctionListEntry exports[] = {
     JS_CFUNC_DEF("initWindow", 3, initWindow),
     JS_CFUNC_DEF("initCanvas", 2, initCanvas),
@@ -271,9 +271,9 @@ static const JSCFunctionListEntry exports[] = {
     JS_CFUNC_DEF("clearBackground", 1, clearBackground),
     JS_CFUNC_DEF("drawRectangle", 5, drawRectangle),
     JS_CFUNC_DEF("drawTextEx", 6, drawTextEx),
+    JS_CFUNC_DEF("loadFont", 1, loadFont),
     JS_CFUNC_DEF("isKeyPressed", 1, isKeyPressed),
     JS_CFUNC_DEF("isKeyDown", 1, isKeyDown),
-    JS_CFUNC_DEF("loadFont", 1, loadFont),
 };
 
 static int set_exports(JSContext* ctx, JSModuleDef* m) {
