@@ -1,90 +1,276 @@
-import { Button, Color, Canvas, Font, Game, Input, Gfx } from './lib.js'
+// @flow
 
-const SPACING = 16
+import {
+  Button,
+  Color,
+  Canvas,
+  Font,
+  Game,
+  Input,
+  Gfx,
+  Utils,
+  Window,
+} from './lib.js'
 
-const EVENT_NEXT_FRAME = Symbol('NextFrameEvent')
-const EVENT_NEW_SCENE = Symbol('NewSceneEvent')
-const EVENT_SET_TAB_INDEX = Symbol('SetTabIndexEvent')
+/*::
 
-const SCENE_TITLE = Symbol('TitleScene')
-const SCENE_OPTIONS = Symbol('OptionsScene')
-const SCENE_PLAYER_CREATION = Symbol('PlayerCreationScene')
-const SCENE_OVERWORLD = Symbol('OverworldScene')
+// -----------------------------------------------------------------------------
+// Form
+// -----------------------------------------------------------------------------
 
-const INPUT_TYPE_NUMBER = Symbol('NumberInput')
+type FormField = {
+  type: 'number',
+  tabIndex: number,
+  key: string,
+  label: string,
+  labelWidth: number,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  targetLength: number,
+  padString: string,
+} | {
+  type: 'text',
+  tabIndex: number,
+  label: string,
+  value: string,
+  placeholder: string,
+} | {
+  type: 'submit',
+  tabIndex: number,
+  label: string,
+}
 
-function init() {
+type FormContext = {
+  tabIndex: number;
+  fields: FormField[],
+}
+
+// -----------------------------------------------------------------------------
+// Scene
+// -----------------------------------------------------------------------------
+
+type SceneName = 'Title' | 'FreePlaySetup' | 'PlayerCreation' | 'Overworld'
+
+type SceneContext = {
+  current: SceneName,
+  next: SceneName | null,
+  duration: number,
+  enteredAt: number,
+  exitDelay: number,
+}
+
+// -----------------------------------------------------------------------------
+// Entities
+// -----------------------------------------------------------------------------
+
+type PlayerType = 'Human' | 'CPU'
+
+type Player = {
+  type: PlayerType,
+  name: string,
+  level: number,
+  xp: number,
+}
+
+// -----------------------------------------------------------------------------
+// GameMode
+// -----------------------------------------------------------------------------
+
+type GameMode = null | 'FreePlay' | 'Story'
+
+type FreePlayModeSettings = {
+  numberOfRounds: number,
+  startingLevel: number,
+  numberOfPlayers: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
+}
+
+type StoryModeSettings = {
+  numberOfPlayers: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
+}
+
+type GameData = 
+| null
+| {
+  mode: 'FreePlay',
+  settings: FreePlayModeSettings,
+}
+| {
+  mode: 'Story',
+  settings: StoryModeSettings,
+}
+
+// -----------------------------------------------------------------------------
+// Game
+// -----------------------------------------------------------------------------
+
+type GameContext = {
+  form: FormContext,
+  scene: SceneContext,
+  data: GameData,
+}
+
+// -----------------------------------------------------------------------------
+// Commands
+// -----------------------------------------------------------------------------
+
+type Command =
+  | { kind: 'FrameEnd', data: null }
+  | { kind: 'PrevTabIndex', data: null }
+  | { kind: 'NextTabIndex', data: null }
+  | { kind: 'NextScene', data: {
+      to: SceneName,
+      delay?: number,
+    }}
+
+type CommandKind = $PropertyType<Command, 'kind'>
+
+type CommandData = $PropertyType<Command, 'data'>
+
+type CommandDispatcher = (CommandKind, CommandData) => void
+
+// -----------------------------------------------------------------------------
+// Lifecycle
+// -----------------------------------------------------------------------------
+
+type GameContextInitializer = () => GameContext
+
+type GameUpdater = (GameContext, CommandDispatcher) => void
+
+type GameCommandSubscriber = (GameContext, Command) => void
+
+type GameContextDestroyer = (GameContext) => void
+
+*/
+
+function init() /*: GameContext */ {
   return {
-    frame: 0,
-    scene: SCENE_TITLE,
-    enteredAt: 0,
-    tabIndex: 0,
-    options: {
-      numberOfRounds: 1,
-      startingLevel: 1,
-      numberOfPlayers: 1,
+    form: {
+      tabIndex: 0,
+      fields: [],
     },
-    [SCENE_TITLE]: {
-      blinkRate: 32,
+    scene: {
+      current: 'Title',
+      next: null,
+      duration: 0,
+      enteredAt: 0,
+      exitDelay: 0,
     },
-    [SCENE_OPTIONS]: {
-      inputs: [
-        [
-          INPUT_TYPE_NUMBER,
-          {
-            tabIndex: 0,
-            label: 'Number of Rounds  ',
-            defaultValue: 10,
-            value: null,
-            min: 1,
-            max: 100,
-            step: 1,
-          },
-        ],
-        [
-          INPUT_TYPE_NUMBER,
-          {
-            tabIndex: 1,
-            label: 'Starting Level    ',
-            defaultValue: 1,
-            value: null,
-            min: 1,
-            max: 100,
-            step: 1,
-          },
-        ],
-        [
-          INPUT_TYPE_NUMBER,
-          {
-            tabIndex: 2,
-            label: 'Number of Players ',
-            defaultValue: 1,
-            value: null,
-            targetLength: 3,
-            padString: ' ',
-            min: 1,
-            max: 8,
-            step: 1,
-          },
-        ],
-      ],
-    },
-    [SCENE_OVERWORLD]: {
-      players: [],
-    },
+    data: null,
   }
 }
 
-function destroy() {}
+function destroy(_ctx /*: GameContext */) {
+  // noop
+}
 
-function update(ctx, dispatch) {
-  const { scene, frame } = ctx
+function subscribe(ctx /*: GameContext */, cmd /*: Command */) {
+  switch (cmd.kind) {
+    case 'FrameEnd': {
+      const { form, scene } = ctx
+      scene.exitDelay = Math.max(0, scene.exitDelay - 1)
+      if (scene.next && !scene.exitDelay) {
+        // New Scene
+        scene.duration = 0
+        scene.enteredAt = Window.frame
+        scene.current = scene.next
+        scene.next = null
+        form.tabIndex = 0
+      } else {
+        scene.duration++
+      }
+      break
+    }
+    case 'PrevTabIndex': {
+      const { form } = ctx
+      const tabIndex = Math.max(0, form.tabIndex - 1)
+      ctx.form.tabIndex = tabIndex
+      break
+    }
+    case 'NextTabIndex': {
+      const { form } = ctx
+      const tabIndex = Math.min(form.fields.length - 1, form.tabIndex + 1)
+      ctx.form.tabIndex = tabIndex
+      break
+    }
+    case 'NextScene': {
+      const { scene } = ctx
+      if (scene.next) break
+      const { to, delay } = cmd.data
+      scene.next = to
+      scene.exitDelay = delay ?? 0
+      switch (scene.next) {
+        case 'FreePlaySetup': {
+          const labelWidth = Canvas.width - 56
+          ctx.form.fields = [
+            {
+              type: 'number',
+              tabIndex: 0,
+              key: '',
+              labelWidth,
+              label: 'Number of Rounds',
+              value: 10,
+              min: 1,
+              max: 100,
+              step: 1,
+              targetLength: 3,
+              padString: ' ',
+            },
+            {
+              type: 'number',
+              tabIndex: 1,
+              key: '',
+              label: 'Starting Level',
+              labelWidth,
+              value: 1,
+              min: 1,
+              max: 100,
+              step: 1,
+              targetLength: 3,
+              padString: ' ',
+            },
+            {
+              type: 'number',
+              tabIndex: 2,
+              key: '',
+              labelWidth,
+              label: 'Number of Players',
+              value: 1,
+              min: 1,
+              max: 8,
+              step: 1,
+              targetLength: 3,
+              padString: ' ',
+            },
+            {
+              type: 'submit',
+              tabIndex: 3,
+              label: 'next',
+            },
+          ]
+          break
+        }
+      }
+      break
+    }
+  }
+}
+
+function update(
+  ctx /*: GameContext */,
+  dispatch /*: (CommandKind, ?CommandData) => void */,
+) {
+  const { tabIndex, fields } = ctx.form
+  const { current, duration, exitDelay } = ctx.scene
   Gfx.clear(Color.black)
-  if (scene === SCENE_TITLE) {
-    const { blinkRate } = ctx[SCENE_TITLE]
-    if (frame % blinkRate < blinkRate / 2) {
-      const font = Font.medium;
+  switch (current) {
+    case 'Title': {
+      // -----------------------------------------------------------------------
+      // Draw Title
+      // -----------------------------------------------------------------------
       const msg = 'PRESS A TO START'
+      const font = Font.medium
       const { width, height } = Gfx.measureText(font, msg)
       Gfx.print(
         font,
@@ -92,232 +278,116 @@ function update(ctx, dispatch) {
         Canvas.width / 2 - width / 2,
         Canvas.height / 2 - height / 2,
         Color.white,
+        exitDelay ? 16 : 64,
       )
+      // -----------------------------------------------------------------------
+      // Update Title
+      // -----------------------------------------------------------------------
+      if (Input.isButtonPressed(Button.A)) {
+        // Go to the next scene
+        dispatch('NextScene', { to: 'FreePlaySetup', delay: 64 })
+      }
+      break
     }
-    if (Input.isButtonPressed(Button.A)) {
-      dispatch(EVENT_NEW_SCENE, SCENE_OPTIONS)
-    }
-  } else if (scene === SCENE_OPTIONS) {
-    const { inputs } = ctx[SCENE_OPTIONS]
-    // Draw
-    {
-      const offset = 16
-      const duration = ctx.frame - ctx.enteredAt
-      let x = -offset + Math.min(duration, offset)
+    case 'FreePlaySetup': {
+      // -----------------------------------------------------------------------
+      // Draw FreePlaySetup
+      // -----------------------------------------------------------------------
+      const verticalSpacing = 16
+      const indent = 8
+      const marginLeft = -32
+      const marginBottom = -16
+      const fieldDelay = 8
+      const maxExitDelay = fieldDelay * (fields.length - 1) - marginLeft
+      let time = exitDelay || duration
+      let x = Utils.clamp(marginLeft, 0, marginLeft + time)
       let y = 0
-      Gfx.print(Font.medium, 'SETUP!', x + 1, 1, Color.white)
-      y += SPACING
-      for (const [type, options] of inputs) {
-        const i = options.tabIndex
-        const isFocused = i == ctx.tabIndex
-        if (type == INPUT_TYPE_NUMBER) {
-          const n = i * 4;
-          const x_ = -offset + Math.min(duration - n, offset)
-          if (Gfx.numberInput(x_, y, isFocused, options)) {
-            // input updated
+      Gfx.print(Font.medium, 'SETUP!', x + indent, y + indent, Color.white)
+      y += verticalSpacing * 2
+      for (const field of fields) {
+        const i = field.tabIndex
+        const isFocused = i == tabIndex
+        const n = i * fieldDelay
+        switch (field.type) {
+          case 'number': {
+            const x_ = Utils.clamp(marginLeft, x, marginLeft - n + time)
+            if (Gfx.formField(x_ + indent, y + indent, isFocused, field)) {
+              // input updated
+            }
+            break
           }
-          y += SPACING
+          case 'submit': {
+            const font = Font.medium
+            const { width, height } = Gfx.measureText(font, field.label)
+            const x = Canvas.width / 2 - width / 2
+            const y = Utils.clamp(
+              Canvas.height + marginBottom,
+              Canvas.height - marginBottom,
+              Canvas.height - marginBottom - time,
+            ) - 8
+            if (Gfx.formField(x, y, isFocused, field, font)) {
+              dispatch('NextScene', {
+                to: 'Title',
+                delay: fieldDelay * (fields.length - 1) - marginLeft,
+              })
+            }
+            break
+          }
         }
+        y += verticalSpacing
       }
-    }
-    // Update
-    {
-      // Cancel
+      if (exitDelay) {
+        const progress = exitDelay / maxExitDelay
+        const { width, height } = Canvas
+        const halfWidth = width / 2
+        const offset = halfWidth * progress
+        Gfx.rectfill(-offset, 0, halfWidth, height, Color.black)
+        Gfx.rectfill(halfWidth + offset, 0, halfWidth, height, Color.black)
+      }
+      // -----------------------------------------------------------------------
+      // Update FreePlaySetup
+      // -----------------------------------------------------------------------
       if (Input.isButtonPressed(Button.B)) {
-        dispatch(EVENT_NEW_SCENE, SCENE_TITLE)
+        // Cancel (Go back to Title)
+        dispatch('NextScene', {
+          to: 'Title',
+          delay: fieldDelay * (fields.length - 1) - marginLeft,
+        })
       }
-      // Prev tabindex
       if (Input.isButtonPressed(Button.up)) {
-        const nextTabIndex = Math.max(0, ctx.tabIndex - 1)
-        dispatch(EVENT_SET_TAB_INDEX, nextTabIndex)
+        // Prev tabIndex
+        dispatch('PrevTabIndex')
       }
-      // Next tabindex
       if (Input.isButtonPressed(Button.down)) {
-        const nextTabIndex = Math.min(inputs.length - 1, ctx.tabIndex + 1)
-        dispatch(EVENT_SET_TAB_INDEX, nextTabIndex)
+        // Next tabIndex
+        dispatch('NextTabIndex')
       }
+      break
     }
-  } else if (scene === SCENE_PLAYER_CREATION) {
-    Gfx.print(Font.small, 'Player Creation!', 0, 0, Color.white)
-  } else if (scene === SCENE_OVERWORLD) {
-    Gfx.print(Font.small, 'Overworld!', 0, 0, Color.white)
+    case 'PlayerCreation': {
+      // -----------------------------------------------------------------------
+      // Draw PlayerCreation
+      // -----------------------------------------------------------------------
+      Gfx.print(Font.medium, 'Player Creation!', 1, 1, Color.white)
+      // -----------------------------------------------------------------------
+      // Update PlayerCreation
+      // -----------------------------------------------------------------------
+      // ...
+      break
+    }
+    case 'Overworld': {
+      // -----------------------------------------------------------------------
+      // Draw Overworld
+      // -----------------------------------------------------------------------
+      Gfx.print(Font.medium, 'Overworld!', 1, 1, Color.white)
+      // -----------------------------------------------------------------------
+      // Update Overworld
+      // -----------------------------------------------------------------------
+      // ...
+      break
+    }
   }
-  dispatch(EVENT_NEXT_FRAME, null)
-}
-
-function subscribe(ctx, [type, data]) {
-  switch (type) {
-    case EVENT_NEXT_FRAME:
-      {
-        ctx.frame++
-      }
-      break
-    case EVENT_NEW_SCENE:
-      {
-        const nextScene = data
-        ctx.scene = nextScene
-        ctx.tabIndex = 0
-        ctx.enteredAt = ctx.frame + 1
-      }
-      break
-    case EVENT_SET_TAB_INDEX:
-      {
-        const nextTabIndex = data
-        ctx.tabIndex = nextTabIndex
-      }
-      break
-  }
+  dispatch('FrameEnd')
 }
 
 Game.run(init, destroy, update, subscribe)
-
-// class Root extends Component {
-//   ctx = {
-//     scene: null,
-//     nextScene: null,
-//     tileSize: 16,
-//     settings = {
-//       numberOfRounds: 1,
-//       startingLevel: 1,
-//       players: [null, null, null, null],
-//     }
-//   }
-//   init() {
-//     console.log('Game init!')
-//     const scene = new TitleScene()
-//     this.ctx.scene = scene
-//     this.addChild(scene)
-//   }
-//   destroy() {
-//     console.log('Game destroy!')
-//   }
-//   draw() {
-//     super.draw()
-//   }
-//   update() {
-//     for (const child of this.children) {
-//       if (child !== this.ctx.scene) {
-//         this.removeChild(child)
-//       }
-//     }
-//     this.ctx.scene = this.ctx.nextScene ?? this.ctx.scene
-//     this.ctx.nextScene = null
-//     if (!this.children.size) {
-//       this.addChild(this.ctx.scene)
-//     }
-//     super.update()
-//   }
-// }
-
-// class TitleScene extends Component {
-//   frame = 0
-//   draw() {
-//     Gfx.clear(Color.black)
-//     if (this.frame % 32 < 16) {
-//       const charWidth = 4
-//       const charHeight = 4
-//       const charSpacing = 1
-//       const msg = 'Press A to Start'
-//       const msgWidth = msg.length * (charWidth + charSpacing) - 1
-//       Gfx.print(
-//         Font.small,
-//         msg,
-//         Canvas.width / 2 - msgWidth / 2,
-//         Canvas.height / 2 - charHeight / 2,
-//         Color.white,
-//       )
-//     }
-//     super.draw()
-//   }
-//   update() {
-//     if (Input.isButtonPressed(Button.A)) {
-//       this.ctx.nextScene = new OverworldScene()
-//     }
-//     this.frame++
-//     super.update()
-//   }
-// }
-
-// class GameSetupScene extends Component {
-//   static NUMBER_OF_ROUNDS = 'numberOfRounds'
-//   static STARTING_LEVEL = 'startingLevel'
-//   static PLAYERS = 'players'
-//   step = 'numberOfRounds'
-//   draw() {
-//     switch(this.step) {
-//       case GameSetupScene.NUMBER_OF_ROUNDS: {
-//         // ...
-//       }; break;
-//       case GameSetupScene.STARTING_LEVEL: {
-//         // ...
-//       }; break;
-//       case GameSetupScene.PLAYERS: {
-//         // ...
-//       }; break;
-//     }
-//     super.draw()
-//   }
-//   update() {
-//     switch(this.step) {
-//       case GameSetupScene.NUMBER_OF_ROUNDS: {
-//         // ...
-//       }; break;
-//       case GameSetupScene.STARTING_LEVEL: {
-//         // ...
-//       }; break;
-//       case GameSetupScene.PLAYERS: {
-//         // ...
-//       }; break;
-//     }
-//     super.update()
-//   }
-// }
-
-// class OverworldScene extends Component {
-//   players = []
-//   init() {
-//     this.players.push(new Player())
-//     for (const player of this.players) {
-//       this.addChild(player)
-//     }
-//   }
-//   draw() {
-//     Gfx.clear(Color.pink)
-//     super.draw()
-//   }
-//   update() {
-//     if (Input.isButtonPressed(Button.B)) {
-//       this.ctx.nextScene = new TitleScene()
-//     }
-//     super.update()
-//   }
-// }
-
-// class Player extends Component {
-//   x = 0
-//   y = 0
-//   draw() {
-//     const { x, y } = this
-//     const { tileSize } = this.ctx
-//     Gfx.rectfill(x * tileSize, y * tileSize, tileSize, tileSize, Color.black)
-//     super.draw()
-//   }
-//   update() {
-//     if (Input.isButtonPressed(Button.up)) {
-//       this.y--
-//     }
-//     if (Input.isButtonPressed(Button.down)) {
-//       this.y++
-//     }
-//     if (Input.isButtonPressed(Button.left)) {
-//       this.x--
-//     }
-//     if (Input.isButtonPressed(Button.right)) {
-//       this.x++
-//     }
-//     super.update()
-//   }
-// }
-
-// // Start the game
-// Game.render(new Root())

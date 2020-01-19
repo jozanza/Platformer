@@ -84,9 +84,9 @@ export class Game {
     raylib.initCanvas(Canvas.width, Canvas.height)
     raylib.setTargetFPS(Window.fps)
     Font.small = raylib.loadFont('baby.png')
-    Font.medium = raylib.loadFont('chonk.png')
+    Font.medium = raylib.loadFont('thicc.png')
     let events = []
-    const dispatch = (a, b) => events.push([a, b])
+    const dispatch = (kind, data = null) => events.push({ kind, data })
     // init
     const ctx = init()
     while (!raylib.windowShouldClose()) {
@@ -194,7 +194,9 @@ export class Gfx {
     x = 0,
     y = 0,
     color = Color.white,
+    blinkRate = 0,
   ) {
+    if (Window.frame % blinkRate < blinkRate / 2) return
     switch (font) {
       case Font.medium:
         raylib.drawTextEx(Font.medium, text, { x, y }, 7, 1, color)
@@ -223,50 +225,58 @@ export class Gfx {
     }
     return { width, height }
   }
-  static numberInput(x0, y0, isFocused, options) {
-    let pad = 8
-    let x = x0 + pad
-    let y = y0 + pad
-    const { width, height } = Gfx.measureText(Font.small, options.label)
-    // Gfx.rectfill(x0, y0, width + 4 * pad, height + 2 * pad, Color.pink)
-    Gfx.print(Font.small, options.label, x, y, Color.white)
-    const value = options.value ?? options.defaultValue ?? 0
-    const targetLength =
-      options.targetLength ?? (options.max?.toString().length || 0)
-    const displayValue = `${value}`.padStart(
-      targetLength,
-      options.padString ?? ' ',
-    )
-    Gfx.print(
-      Font.small,
-      !isFocused
-        ? `  ${displayValue}  `
-        : value === options.min
-        ? `- ${displayValue} >`
-        : value === options.max
-        ? `< ${displayValue} -`
-        : `< ${displayValue} >`,
-      width + 2 * pad,
-      y,
-      isFocused ? Color.pink : Color.white,
-    )
-    if (!isFocused) return false
-    let delta = 0
-    if (Input.isButtonDown(Button.left, 7)) {
-      delta = -1
+  static formField(x, y, isFocused, field, font = Font.small) {
+    switch (field.type) {
+      case 'submit': {
+        const color = isFocused ? Color.pink : Color.white
+        const { width, height } = Gfx.measureText(font, field.label)
+        const pad = 2
+        Gfx.rectfill(x, y, width + pad * 2, height + pad * 2, color)
+        Gfx.print(font, field.label, x + pad, y + pad, Color.black)
+        return isFocused && Input.isButtonPressed(Button.A)
+      }
+      case 'text': {
+        // ...
+        break
+      }
+      case 'number': {
+        const { width, height } = Gfx.measureText(font, field.label)
+        Gfx.print(font, field.label, x, y, Color.white)
+        const displayValue = `${field.value}`.padStart(
+          field.targetLength,
+          field.padString,
+        )
+        x = x + (field.labelWidth || width)
+        Gfx.print(
+          font,
+          !isFocused
+            ? `   ${displayValue}  `
+            : field.value === field.min
+            ? ` - ${displayValue} >`
+            : field.value === field.max
+            ? ` < ${displayValue} -`
+            : ` < ${displayValue} >`,
+          x,
+          y,
+          isFocused ? Color.pink : Color.white,
+        )
+        if (!isFocused) return false
+        let delta = 0
+        if (Input.isButtonDown(Button.left, 7)) {
+          delta = -1
+        }
+        if (Input.isButtonDown(Button.right, 7)) {
+          delta = 1
+        }
+        if (delta) {
+          field.value = Utils.clamp(
+            field.min,
+            field.max,
+            field.value + delta * field.step,
+          )
+        }
+        return true
+      }
     }
-    if (Input.isButtonDown(Button.right, 7)) {
-      delta = 1
-    }
-    if (delta) {
-      const amount = delta * (options.step ?? 1)
-      const currentValue = options.value ?? options.defaultValue ?? 0
-      options.value = Utils.clamp(
-        options.min ?? -Infinity,
-        options.max ?? Infinity,
-        currentValue + amount,
-      )
-    }
-    return delta
   }
 }
