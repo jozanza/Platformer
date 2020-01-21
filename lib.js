@@ -15,6 +15,10 @@ export class Button {
   static down = 264
   static left = 263
   static right = 262
+  static start = 257 // Enter
+  static select = 32 // Spacebar
+  static L = 340 // Left Shift
+  static R = 344 // Right Shift
 }
 
 export class Color {
@@ -33,8 +37,8 @@ export class Window {
 }
 
 export class Canvas {
-  static width = 160
-  static height = 120
+  static width = 256
+  static height = 144
 }
 
 export class Font {
@@ -42,6 +46,7 @@ export class Font {
   static medium = null
   static large = null
   static jumbo = null
+  static tiles = null
 }
 
 export class Component {
@@ -85,6 +90,7 @@ export class Game {
     raylib.setTargetFPS(Window.fps)
     Font.small = raylib.loadFont('baby.png')
     Font.medium = raylib.loadFont('thicc.png')
+    Font.tiles = raylib.loadFont('tiles.png')
     let events = []
     const dispatch = (kind, data = null) => events.push({ kind, data })
     // init
@@ -195,15 +201,42 @@ export class Gfx {
     y = 0,
     color = Color.white,
     blinkRate = 0,
+    wiggle = false,
   ) {
     if (Window.frame % blinkRate < blinkRate / 2) return
     switch (font) {
-      case Font.medium:
-        raylib.drawTextEx(Font.medium, text, { x, y }, 7, 1, color)
+      case Font.tiles: {
+        raylib.drawTextEx(font, text, { x, y }, 15, 1, color)
         break
+      }
+      case Font.medium: {
+        const charWidth = 7
+        if (!wiggle) {
+          raylib.drawTextEx(font, text, { x, y }, 7, 1, color)
+        } else {
+          const rate = 8
+          const n = Math.PI / text.length
+          let i = 0
+          for (const char of text) {
+            const nn = Math.floor((Window.frame / rate) % (text.length - 1))
+            const oy = Math.sin(nn + i * n)
+            raylib.drawTextEx(
+              font,
+              char,
+              { x: x + i * (charWidth + 1), y: y + oy },
+              7,
+              1,
+              color,
+            )
+            i++
+          }
+        }
+        break
+      }
       case Font.small:
-      default:
+      default: {
         raylib.drawTextEx(Font.small, text, { x, y }, 4, 1, color)
+      }
     }
   }
   static measureText(font = Font.small, text = '', box = null) {
@@ -227,6 +260,18 @@ export class Gfx {
   }
   static formField(x, y, isFocused, field, font = Font.small) {
     switch (field.type) {
+      case 'text': {
+        Gfx.print(font, field.label, x, y, Color.white)
+        x = x + (field.labelWidth || width)
+        Gfx.print(
+          font,
+          `   ${field.value.padEnd(field.targetLength, field.padString)}  `,
+          x,
+          y,
+          isFocused ? Color.pink : Color.white,
+        )
+        break
+      }
       case 'submit': {
         const color = isFocused ? Color.pink : Color.white
         const { width, height } = Gfx.measureText(font, field.label)
@@ -235,8 +280,43 @@ export class Gfx {
         Gfx.print(font, field.label, x + pad, y + pad, Color.black)
         return isFocused && Input.isButtonPressed(Button.A)
       }
-      case 'text': {
-        // ...
+      case 'select': {
+        const { width, height } = Gfx.measureText(font, field.label)
+        Gfx.print(font, field.label, x, y, Color.white)
+        const displayValue = `${field.options[field.value].label}`.padStart(
+          field.targetLength,
+          field.padString,
+        )
+        x = x + (field.labelWidth || width)
+        Gfx.print(
+          font,
+          !isFocused
+            ? `   ${displayValue}  `
+            : field.value === field.min
+            ? ` - ${displayValue} >`
+            : field.value === field.max
+            ? ` < ${displayValue} -`
+            : ` < ${displayValue} >`,
+          x,
+          y,
+          isFocused ? Color.pink : Color.white,
+        )
+        if (!isFocused) return false
+        let delta = 0
+        if (Input.isButtonDown(Button.left, 7)) {
+          delta = -1
+        }
+        if (Input.isButtonDown(Button.right, 7)) {
+          delta = 1
+        }
+        if (delta) {
+          field.value = Utils.clamp(
+            0,
+            field.options.length - 1,
+            field.value + delta,
+          )
+        }
+        return true
         break
       }
       case 'number': {
