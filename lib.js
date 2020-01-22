@@ -206,7 +206,10 @@ export class Gfx {
     if (Window.frame % blinkRate < blinkRate / 2) return
     switch (font) {
       case Font.tiles: {
-        raylib.drawTextEx(font, text, { x, y }, 15, 1, color)
+        const lines = text.split('\n')
+        for (let i = 0; i < lines.length; i++) {
+          raylib.drawTextEx(font, lines[i], { x, y: y + (16 * i) }, 15, 1, color)
+        }
         break
       }
       case Font.medium: {
